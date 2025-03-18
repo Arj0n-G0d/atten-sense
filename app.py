@@ -5,6 +5,7 @@ import cv2
 import tempfile
 import os
 
+
 # Custom CSS
 st.markdown(
     """ <style>
@@ -97,8 +98,12 @@ if st.session_state.analysis_phase == "analyzing":
             if not ret:
                 st.error("Failed to capture image from webcam.")
                 break
+            
+            
+            
 
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
 
             # Process frame and get focus status
             frame, is_focused = process_frame(frame)
