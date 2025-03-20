@@ -1,9 +1,18 @@
 import streamlit as st
 import av
 import cv2
+<<<<<<< Updated upstream
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
 # custom CSS
+=======
+import tempfile
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Custom CSS
+>>>>>>> Stashed changes
 st.markdown(
     """
     <style>
@@ -100,6 +109,7 @@ if "analysis_started" not in st.session_state:
     st.session_state.analysis_started = False
 if "input_method" not in st.session_state:
     st.session_state.input_method = None
+<<<<<<< Updated upstream
 
 # Upload Video or Use Webcam
 video_source = st.radio("Select Input Source:", ("Webcam", "Upload Video"))
@@ -117,9 +127,45 @@ class VideoProcessor(VideoProcessorBase):
         img = frame.to_ndarray(format="bgr24")
         # Future: Add AI Processing Here (e.g., Face Detection)       
         return av.VideoFrame.from_ndarray(img, format="bgr24")
+=======
+if "uploaded_video" not in st.session_state:
+    st.session_state.uploaded_video = None
+if "uploaded_video_path" not in st.session_state:
+    st.session_state.uploaded_video_path = None
+if "focus_log" not in st.session_state:
+    st.session_state.focus_log = []
+
+if st.session_state.analysis_phase == "idle":
+    video_source = st.radio("Choose Your Video Input:", ("Webcam", "Upload Video"))
+    uploaded_video = None
+    if video_source == "Upload Video":
+        uploaded_video = st.file_uploader("Upload a Video File (MP4, AVI, MOV)", type=["mp4", "avi", "mov"])
+
+    if st.button("Begin Attention Analysis"):
+        if video_source == "Upload Video" and uploaded_video is None:
+            st.warning("Kindly upload a video to proceed with the analysis.")
+        else:
+            st.session_state.input_method = video_source
+            st.session_state.analysis_phase = "analyzing"
+            st.session_state.focus_log = []  # Reset log for new session
+            if uploaded_video is not None:
+                temp_file = tempfile.NamedTemporaryFile(dir=uploads_path, delete=False, suffix=".mp4")
+                temp_file.write(uploaded_video.read())
+                temp_file.flush()
+                st.session_state.uploaded_video_path = temp_file.name
+            st.rerun()
+
+if st.session_state.analysis_phase == "analyzing":
+    if st.button("End Attention Analysis"):
+        st.session_state.input_method = None
+        st.session_state.analysis_phase = "analysis_complete"
+        st.session_state.uploaded_video = None
+        st.rerun()
+>>>>>>> Stashed changes
 
 if st.button("Start Analysis"):
     if st.session_state.input_method == "Webcam":
+<<<<<<< Updated upstream
         st.session_state.analysis_started = True
     elif uploaded_file is not None:
         st.session_state.analysis_started = True
@@ -151,3 +197,84 @@ if st.session_state.analysis_started:
         # Process video file
         video_bytes = uploaded_file.read()
         st.video(video_bytes)  # Display video
+=======
+        st.write("Live webcam stream activated. Stay focused!")
+        cap = cv2.VideoCapture(0)
+        stframe = st.empty()
+        focus_status_placeholder = st.empty()
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                st.error("Failed to capture image from webcam.")
+                break
+            
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame, is_focused = process_frame(frame)
+            stframe.image(frame, channels="RGB")
+
+            status_text = "Focused" if is_focused else "Not Focused"
+            color_class = "focused" if is_focused else "not-focused"
+            focus_status_placeholder.markdown(
+                f'<p class="focus-text {color_class}" style="font-size: 50px;">{status_text}</p>', 
+                unsafe_allow_html=True
+            )
+            
+            st.session_state.focus_log.append((time.time(), is_focused))
+
+        cap.release()
+
+    elif st.session_state.uploaded_video_path is not None:
+        st.write("Processing your video... Sit tight!")
+        cap = cv2.VideoCapture(st.session_state.uploaded_video_path)
+        stframe = st.empty()
+        focus_status_placeholder = st.empty()
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                st.warning("Video processing complete.")
+                break
+
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame, is_focused = process_frame(frame)
+            stframe.image(frame, channels="RGB")
+            status_text = "Focused" if is_focused else "Not Focused"
+            color_class = "focused" if is_focused else "not-focused"
+
+            focus_status_placeholder.markdown(
+                f'<p class="focus-text {color_class}" style="font-size: 50px;">{status_text}</p>', 
+                unsafe_allow_html=True
+            )
+
+            st.session_state.focus_log.append((time.time(), is_focused))
+            time.sleep(0.03)
+
+        cap.release()
+
+if st.session_state.analysis_phase == "analysis_complete":
+    st.write("### Focus Session Summary")
+    df = pd.DataFrame(st.session_state.focus_log, columns=["Timestamp", "Focused"])
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="s")
+    df["Focused"] = df["Focused"].astype(int)
+    focus_percentage = df["Focused"].mean() * 100
+
+    st.write(f"**Total Time Logged:** {len(df)} seconds")
+    st.write(f"**Percentage of Time Focused:** {focus_percentage:.2f}%")
+
+    fig, ax = plt.subplots()
+    ax.plot(df["Timestamp"], df["Focused"], marker="o", linestyle="-", linewidth=1, color="blue", label="Focus Level")
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Focus (0 = Not Focused, 1 = Focused)")
+    ax.set_title("Focus Over Time")
+    ax.legend()
+    ax.grid(True)
+    st.pyplot(fig)
+
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button("Download Focus Log", csv, "focus_log.csv", "text/csv", key='download-csv')
+
+    if st.button("Return to Home"):
+        st.session_state.analysis_phase = "idle"
+        st.rerun()
+>>>>>>> Stashed changes
