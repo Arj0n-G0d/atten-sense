@@ -6,7 +6,8 @@ import dlib
 from scipy.spatial import distance
 
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor("D:\\atten-sense\\src\\shape_predictor_68_face_landmarks.dat")
+predictor = dlib.shape_predictor(r"C:\Users\HP\atten-sense\src\shape_predictor_68_face_landmarks.dat")
+predictor = dlib.shape_predictor("src/shape_predictor_68_face_landmarks.dat")
 
 # Eye landmark indices
 LEFT_EYE = list(range(42, 48))
