@@ -6,11 +6,6 @@ import time
 import cv2
 import tempfile
 import os
-<<<<<<< Updated upstream
-
-
-# Custom CSS
-=======
 import plotly.io as pio
 import plotly.graph_objects as go
 from reportlab.lib.pagesizes import letter
@@ -18,7 +13,6 @@ from reportlab.pdfgen import canvas
 
 st.set_page_config(page_title="AttenSense", layout="centered")
 # custom CSS
->>>>>>> Stashed changes
 st.markdown(
     """
     <style>
@@ -122,13 +116,10 @@ if "uploaded_video" not in st.session_state:
     st.session_state.uploaded_video = None
 if "uploaded_video_path" not in st.session_state:
     st.session_state.uploaded_video_path = None
-<<<<<<< Updated upstream
-=======
 if "focus_log" not in st.session_state:
     st.session_state.focus_log = []
 
 #input phase
->>>>>>> Stashed changes
 
 if st.session_state.analysis_phase == "idle":
     # Upload Video or Use Webcam
@@ -163,11 +154,8 @@ if st.session_state.analysis_phase == "analyzing":
     if st.session_state.input_method == "Webcam":
         st.write("Live webcam stream activated. Stay focused!")
         cap = cv2.VideoCapture(0)  # 0 for default webcam
-<<<<<<< Updated upstream
         stframe = st.empty()
         focus_status_placeholder = st.empty()
-=======
->>>>>>> Stashed changes
 
         while cap.isOpened():
             ret, frame = cap.read()
@@ -180,12 +168,9 @@ if st.session_state.analysis_phase == "analyzing":
             # Process frame and get focus status
             frame, is_focused = process_frame(frame)
 
-<<<<<<< Updated upstream
-=======
             current_time = time.time() - start_time
             st.session_state.focus_log.append((current_time, is_focused))
 
->>>>>>> Stashed changes
             stframe.image(frame, channels="RGB")
 
             # Display focus status
@@ -195,22 +180,16 @@ if st.session_state.analysis_phase == "analyzing":
                 f'<p class="focus-text {color_class}" style="font-size: 50px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
                 unsafe_allow_html=True
             )
-<<<<<<< Updated upstream
-=======
             if st.session_state.analysis_phase != "analyzing":
                 break
->>>>>>> Stashed changes
 
         cap.release()
 
     elif st.session_state.uploaded_video_path is not None:
         st.write("Processing your video... Sit tight!")
         cap = cv2.VideoCapture(st.session_state.uploaded_video_path)
-<<<<<<< Updated upstream
         stframe = st.empty()
         focus_status_placeholder = st.empty()
-=======
->>>>>>> Stashed changes
 
         while cap.isOpened():
             ret, frame = cap.read()
@@ -223,13 +202,10 @@ if st.session_state.analysis_phase == "analyzing":
             # Process frame and get focus status
             frame, is_focused = process_frame(frame)
 
-<<<<<<< Updated upstream
-=======
             #focus log
             current_time = time.time() - start_time
             st.session_state.focus_log.append((current_time, is_focused))
 
->>>>>>> Stashed changes
             stframe.image(frame, channels="RGB")
             status_text = "Focused" if is_focused else "Not Focused"
             color_class = "focused" if is_focused else "not-focused"
@@ -243,11 +219,6 @@ if st.session_state.analysis_phase == "analyzing":
 
         cap.release()
 
-<<<<<<< Updated upstream
-if st.session_state.analysis_phase == "analysis_complete":
-    if st.button("Return to Home"):
-        st.session_state.analysis_phase = "idle"
-=======
 # Report phase
 if st.session_state.analysis_phase == "analysis_complete":
     focus_log = st.session_state.focus_log
@@ -303,5 +274,4 @@ if st.session_state.analysis_phase == "analysis_complete":
         st.session_state.analysis_phase = "idle"
         st.session_state.focus_log = []
         st.session_state.uploaded_video_path = None
->>>>>>> Stashed changes
         st.rerun()
