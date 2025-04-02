@@ -4,12 +4,8 @@ import dlib
 from scipy.spatial import distance
 
 detector = dlib.get_frontal_face_detector()
-<<<<<<< HEAD
 # predictor = dlib.shape_predictor(r"C:\Users\HP\atten-sense\src\shape_predictor_68_face_landmarks.dat")
 predictor = dlib.shape_predictor("src/shape_predictor_68_face_landmarks.dat")
-=======
-predictor = dlib.shape_predictor("/home/g0d/Desktop/atten-sense/src/shape_predictor_68_face_landmarks.dat")
->>>>>>> 8cdebc0 (fix: Focus Over Time Graph)
 
 # Eye landmark indices
 LEFT_EYE = list(range(42, 48))

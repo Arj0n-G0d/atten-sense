@@ -53,8 +53,6 @@ st.set_page_config(page_title = "AttenSense", layout = "centered")
 st.markdown(
     """
     <style>
-    """
-    <style>
         /* setting bg colour */
         [data-testid="stAppViewContainer"] {
             background-color: #FDFBEE;
@@ -137,6 +135,9 @@ st.markdown(
         /* CSS for Focus / Not Focused */
         .focused {
             color: green;
+        }
+        .not-focused {
+            color: red;
         }
 
         /* Change the hover effect */
