@@ -1,19 +1,58 @@
 import pandas as pd
-import io
+from io import StringIO
 import streamlit as st
 from src.frame_processor import process_frame
 import time
 import cv2
 import tempfile
 import os
-import plotly.io as pio
-import plotly.graph_objects as go
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+import altair as alt
 
-st.set_page_config(page_title="AttenSense", layout="centered")
-# custom CSS
+def group_focus_log(focus_log):
+    if not focus_log:
+        return []
+    
+    grouped_log = []
+    start_time, state = focus_log[0]  # Initialize with first entry
+
+    for i in range(1, len(focus_log)):
+        current_time, current_state = focus_log[i]
+
+        # If state changes, store the previous segment
+        if current_state != state:
+            grouped_log.append((start_time, focus_log[i - 1][0], state))  # (start, end, state)
+            start_time = current_time  # Update start time for the new state
+            state = current_state  # Update state
+
+    # Append last segment
+    grouped_log.append((start_time, focus_log[-1][0], state))
+    
+    return grouped_log
+
+def create_data_frame(focus_log):
+    grouped_focus_log = group_focus_log(focus_log)
+    df = pd.DataFrame(grouped_focus_log, columns = ["Start", "End", "Focused"])
+    df["Duration"] = df["End"] - df["Start"]
+    df["Focus State"] = df["Focused"].map({True: "Focused", False: "Unfocused"})
+    df.drop("Focused", axis = 1, inplace = True)
+
+    return df
+
+def create_altair_chart(df):
+    chart = alt.Chart(df).mark_bar().encode(
+        x="Start:Q",
+        x2="End:Q",
+        y=alt.Y("Focus State:N", title="Focus State"),
+        color="Focus State:N"
+    ).properties(title="Focus Over Time")
+    return chart
+
+st.set_page_config(page_title = "AttenSense", layout = "centered")
+
+# Custom CSS
 st.markdown(
+    """
+    <style>
     """
     <style>
         /* setting bg colour */
@@ -95,6 +134,17 @@ st.markdown(
             color: black !important;              
             transform: scale(1.02);               
         }
+        /* CSS for Focus / Not Focused */
+        .focused {
+            color: green;
+        }
+
+        /* Change the hover effect */
+        div[data-testid="stFileUploader"] button:hover {
+            background-color: #A5B68D !important;  
+            color: black !important;              
+            transform: scale(1.02);               
+        }
     </style>
     """,
     unsafe_allow_html=True
@@ -119,8 +169,7 @@ if "uploaded_video_path" not in st.session_state:
 if "focus_log" not in st.session_state:
     st.session_state.focus_log = []
 
-#input phase
-
+# Input Phase
 if st.session_state.analysis_phase == "idle":
     # Upload Video or Use Webcam
     video_source = st.radio("Choose Your Video Input:", ("Webcam", "Upload Video"))
@@ -135,6 +184,7 @@ if st.session_state.analysis_phase == "idle":
             st.warning("Kindly upload a video to proceed with the analysis.")
         else:
             st.session_state.input_method = video_source
+            st.session_state.start_time = time.time()
             st.session_state.analysis_phase = "analyzing"
             if uploaded_video is not None:
                 temp_file = tempfile.NamedTemporaryFile(dir=uploads_path, delete=False, suffix=".mp4")
@@ -163,11 +213,14 @@ if st.session_state.analysis_phase == "analyzing":
                 st.error("Failed to capture image from webcam.")
                 break
             
+            
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
             
             # Process frame and get focus status
             frame, is_focused = process_frame(frame)
 
+            start_time = st.session_state.start_time
             current_time = time.time() - start_time
             st.session_state.focus_log.append((current_time, is_focused))
 
@@ -176,12 +229,12 @@ if st.session_state.analysis_phase == "analyzing":
             # Display focus status
             status_text = "Focused" if is_focused else "Not Focused"
             color_class = "focused" if is_focused else "not-focused"
+
             focus_status_placeholder.markdown(
-                f'<p class="focus-text {color_class}" style="font-size: 50px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
+                f'<p class="focus-text {color_class}" style="font-size: 36px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
                 unsafe_allow_html=True
             )
-            if st.session_state.analysis_phase != "analyzing":
-                break
+            time.sleep(0.05)
 
         cap.release()
 
@@ -199,10 +252,11 @@ if st.session_state.analysis_phase == "analyzing":
 
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
+            
             # Process frame and get focus status
             frame, is_focused = process_frame(frame)
 
-            #focus log
+            start_time = st.session_state.start_time
             current_time = time.time() - start_time
             st.session_state.focus_log.append((current_time, is_focused))
 
@@ -211,11 +265,10 @@ if st.session_state.analysis_phase == "analyzing":
             color_class = "focused" if is_focused else "not-focused"
 
             focus_status_placeholder.markdown(
-                f'<p class="focus-text {color_class}" style="font-size: 50px;">{status_text}</p>', 
+                f'<p class="focus-text {color_class}" style="font-size: 36px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
                 unsafe_allow_html=True
             )
-
-            time.sleep(0.03)
+            time.sleep(0.05)
 
         cap.release()
 
@@ -223,7 +276,7 @@ if st.session_state.analysis_phase == "analyzing":
 if st.session_state.analysis_phase == "analysis_complete":
     focus_log = st.session_state.focus_log
     if focus_log:
-        frame_duration = 0.03  # Approx 30 fps
+        frame_duration = 0.05  # 20 fps
         total_duration = len(focus_log) * frame_duration
         focused_duration = sum(1 for _, f in focus_log if f) * frame_duration
         unfocused_duration = total_duration - focused_duration
@@ -235,43 +288,26 @@ if st.session_state.analysis_phase == "analysis_complete":
         st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
         st.write(f"**Focus Percentage:** {focus_percentage:.2f}%")
 
-        timestamps = [t for t, _ in focus_log]
-        focus_values = [1 if f else 0 for _, f in focus_log]
+        focus_df = create_data_frame(focus_log)
+        chart = create_altair_chart(focus_df)
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=timestamps, y=focus_values, mode='lines+markers',
-                                    name='Focus Status',
-                                    line=dict(color='green'),
-                                    marker=dict(color=['green' if f else 'red' for f in focus_values])))
-
-        fig.update_layout(title='Focus Over Time',
-                            xaxis_title='Time (s)',
-                            yaxis_title='Focus (1=Focused, 0=Not Focused)',
-                            yaxis=dict(tickmode='array', tickvals=[0, 1],
-                                        ticktext=["Not Focused", "Focused"]),
-                            height=400)
-
-        st.plotly_chart(fig, use_container_width=True)
+        st.altair_chart(chart, use_container_width=True)
         
-        # Create a DataFrame for focus log
-        focus_df = pd.DataFrame(st.session_state.focus_log, columns=["Time (s)", "Focused"])
-        focus_df["Focused"] = focus_df["Focused"].apply(lambda x: "Focused" if x else "Not Focused")
-
         # Convert to CSV
-        csv_buffer = io.StringIO()
-        focus_df.to_csv(csv_buffer, index=False)
-        csv_data = csv_buffer.getvalue()
+        csv_data = focus_df.to_csv(index = False)
 
         # Provide a download button
         st.download_button(
-            label="📥 Download Focus Report",
-            data=csv_data,
-            file_name="focus_report.csv",
-            mime="text/csv"
+            label = "📥 Download Focus Report",
+            data = csv_data,
+            file_name = "focus_report.csv",
+            mime = "text/csv"
         )
     
     if st.button("Return to Home"):
         st.session_state.analysis_phase = "idle"
+        st.session_state.focus_log = []
+        st.session_state.uploaded_video_path = None
         st.session_state.focus_log = []
         st.session_state.uploaded_video_path = None
         st.rerun()
