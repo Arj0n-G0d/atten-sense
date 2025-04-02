@@ -1,6 +1,5 @@
 import cv2
 import time
-import torch
 from ultralytics import YOLO
 
 # Load YOLOv8 model (make sure you have 'yolov8n.pt')

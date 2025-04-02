@@ -7,30 +7,6 @@ detector = dlib.get_frontal_face_detector()
 # predictor = dlib.shape_predictor(r"C:\Users\HP\atten-sense\src\shape_predictor_68_face_landmarks.dat")
 predictor = dlib.shape_predictor("src/shape_predictor_68_face_landmarks.dat")
 
-# Eye landmark indices
-LEFT_EYE = list(range(42, 48))
-RIGHT_EYE = list(range(36, 42))
-
-# 3D model points for head pose estimation
-MODEL_POINTS = np.array([
-    (0.0, 0.0, 0.0),  # Nose tip
-    (-30.0, -125.0, -30.0),  # Left eye left corner
-    (30.0, -125.0, -30.0),  # Right eye right corner
-    (-60.0, -70.0, -60.0),  # Left mouth corner
-    (60.0, -70.0, -60.0),  # Right mouth corner
-    (0.0, -150.0, -50.0)  # Chin
-], dtype=np.float32)
-
-# Camera matrix (Assuming a standard focal length)
-FOCAL_LENGTH = 600
-CAMERA_MATRIX = np.array([
-    [FOCAL_LENGTH, 0, 320],
-    [0, FOCAL_LENGTH, 240],
-    [0, 0, 1]
-], dtype=np.float32)
-
-DIST_COEFFS = np.zeros((4, 1))  # Assuming no lens distortion
-
 # Eye Aspect Ratio (EAR) function
 def eye_aspect_ratio(eye):
     A = distance.euclidean(eye[1], eye[5])
@@ -59,6 +35,10 @@ def process_frame(frame):
         landmarks = predictor(gray, face)
         landmarks = np.array([(landmarks.part(i).x, landmarks.part(i).y) for i in range(68)])
 
+        # Eye landmark indices
+        LEFT_EYE = list(range(42, 48))
+        RIGHT_EYE = list(range(36, 42))
+
         # Extract eye landmarks
         left_eye = landmarks[LEFT_EYE]
         right_eye = landmarks[RIGHT_EYE]
@@ -79,14 +59,6 @@ def process_frame(frame):
         else:
             cv2.putText(frame, "Eyes Open", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # Check face movement
-        nose = (landmarks[30][0], landmarks[30][1])
-        right_edge = (landmarks[14][0], landmarks[14][1])
-        left_edge = (landmarks[2][0], landmarks[2][1])
-
-        if compute_euclidean_dist(nose, right_edge) < 20 or compute_euclidean_dist(nose, left_edge) < 20:
-            is_focused = False
-
         # Head Pose Estimation
         image_points = np.array([
             landmarks[30],  # Nose tip
@@ -96,6 +68,26 @@ def process_frame(frame):
             landmarks[54],  # Right mouth corner
             landmarks[8]  # Chin
         ], dtype=np.float32)
+
+        # 3D model points for head pose estimation
+        MODEL_POINTS = np.array([
+            (0.0, 0.0, 0.0),  # Nose tip
+            (-30.0, -125.0, -30.0),  # Left eye left corner
+            (30.0, -125.0, -30.0),  # Right eye right corner
+            (-60.0, -70.0, -60.0),  # Left mouth corner
+            (60.0, -70.0, -60.0),  # Right mouth corner
+            (0.0, -150.0, -50.0)  # Chin
+        ], dtype=np.float32)
+
+        # Camera matrix (Assuming a standard focal length)
+        FOCAL_LENGTH = 600
+        CAMERA_MATRIX = np.array([
+            [FOCAL_LENGTH, 0, 320],
+            [0, FOCAL_LENGTH, 240],
+            [0, 0, 1]
+        ], dtype=np.float32)
+
+        DIST_COEFFS = np.zeros((4, 1))  # Assuming no lens distortion
 
         success, rotation_vector, translation_vector = cv2.solvePnP(
             MODEL_POINTS, image_points, CAMERA_MATRIX, DIST_COEFFS
