@@ -172,13 +172,13 @@ if "uploaded_video_path" not in st.session_state:
     st.session_state.uploaded_video_path = None
 if "focus_log" not in st.session_state:
     st.session_state.focus_log = []
-if "user_name" not in st.session_state:
-    st.session_state.user_name = None
+if "name" not in st.session_state:
+    st.session_state.name = None
 
 # Input Phase
 if st.session_state.analysis_phase == "idle":
     # Enter user's name
-    st.session_state.user_name = st.text_input("Enter your name:")
+    st.session_state.name = st.text_input("Enter your name:")
     # Upload Video or Use Webcam
     video_source = st.radio("Choose Your Video Input:", ("Webcam", "Upload Video"))
 
@@ -283,7 +283,7 @@ if st.session_state.analysis_phase == "analyzing":
 # Report phase
 if st.session_state.analysis_phase == "analysis_complete":
     focus_log = st.session_state.focus_log
-    user_name = st.session_state.user_name
+    name = st.session_state.name
     if focus_log:
         frame_duration = 0.05  # 20 fps
         total_duration = len(focus_log) * frame_duration
@@ -296,14 +296,15 @@ if st.session_state.analysis_phase == "analysis_complete":
         chart = create_altair_chart(focus_df)
 
         # Inserting focus session
-        session_id = insert_focus_session(user_name)
+        session_id = insert_focus_session(name)
 
         # Inserting focus logs
         for (start, end, focus_state) in grouped_focus_log:
             insert_focus_log(session_id, start, end, focus_state)
 
         st.subheader("📊 Focus Report")
-        st.write(f"**Name:** {user_name}")
+        st.write(f"**Session Id:** {session_id}")
+        st.write(f"**Name:** {name}")
         st.write(f"**Total Duration:** {total_duration:.2f} seconds")
         st.write(f"**Focused Duration:** {focused_duration:.2f} seconds")
         st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
