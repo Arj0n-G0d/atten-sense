@@ -329,4 +329,5 @@ if st.session_state.analysis_phase == "analysis_complete":
         st.session_state.uploaded_video_path = None
         st.session_state.focus_log = []
         st.session_state.uploaded_video_path = None
+        st.session_state.name = None
         st.rerun()
