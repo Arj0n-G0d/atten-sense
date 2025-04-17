@@ -2,6 +2,7 @@ import pandas as pd
 from io import StringIO
 import streamlit as st
 from src.frame_processor import process_frame
+from db.db_utils import create_db, insert_focus_session, insert_focus_log
 import time
 import cv2
 import tempfile
@@ -30,10 +31,9 @@ def group_focus_log(focus_log):
     return grouped_log
 
 def create_data_frame(focus_log):
-    grouped_focus_log = group_focus_log(focus_log)
-    df = pd.DataFrame(grouped_focus_log, columns = ["Start", "End", "Focused"])
+    df = pd.DataFrame(focus_log, columns = ["Start", "End", "Focused"])
     df["Duration"] = df["End"] - df["Start"]
-    df["Focus State"] = df["Focused"].map({True: "Focused", False: "Unfocused"})
+    df["Focus State"] = df["Focused"].map({True: "Focused", False: "Not Focused"})
     df.drop("Focused", axis = 1, inplace = True)
 
     return df
@@ -158,6 +158,9 @@ os.makedirs(uploads_path, exist_ok=True)
 st.markdown('<h1 class="title">AttenSense</h1>', unsafe_allow_html=True)
 st.write("An AI-based tool to analyze human attention using computer vision.")
 
+# Creating Atten-Sense database
+create_db()
+
 # Initialize session state
 if "analysis_phase" not in st.session_state:
     st.session_state.analysis_phase = "idle"
@@ -169,9 +172,13 @@ if "uploaded_video_path" not in st.session_state:
     st.session_state.uploaded_video_path = None
 if "focus_log" not in st.session_state:
     st.session_state.focus_log = []
+if "user_name" not in st.session_state:
+    st.session_state.user_name = None
 
 # Input Phase
 if st.session_state.analysis_phase == "idle":
+    # Enter user's name
+    st.session_state.user_name = st.text_input("Enter your name:")
     # Upload Video or Use Webcam
     video_source = st.radio("Choose Your Video Input:", ("Webcam", "Upload Video"))
 
@@ -276,6 +283,7 @@ if st.session_state.analysis_phase == "analyzing":
 # Report phase
 if st.session_state.analysis_phase == "analysis_complete":
     focus_log = st.session_state.focus_log
+    user_name = st.session_state.user_name
     if focus_log:
         frame_duration = 0.05  # 20 fps
         total_duration = len(focus_log) * frame_duration
@@ -283,14 +291,23 @@ if st.session_state.analysis_phase == "analysis_complete":
         unfocused_duration = total_duration - focused_duration
         focus_percentage = (focused_duration / total_duration) * 100 if total_duration > 0 else 0
 
+        grouped_focus_log = group_focus_log(focus_log)
+        focus_df = create_data_frame(grouped_focus_log)
+        chart = create_altair_chart(focus_df)
+
+        # Inserting focus session
+        session_id = insert_focus_session(user_name)
+
+        # Inserting focus logs
+        for (start, end, focus_state) in grouped_focus_log:
+            insert_focus_log(session_id, start, end, focus_state)
+
         st.subheader("📊 Focus Report")
+        st.write(f"**Name:** {user_name}")
         st.write(f"**Total Duration:** {total_duration:.2f} seconds")
         st.write(f"**Focused Duration:** {focused_duration:.2f} seconds")
         st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
         st.write(f"**Focus Percentage:** {focus_percentage:.2f}%")
-
-        focus_df = create_data_frame(focus_log)
-        chart = create_altair_chart(focus_df)
 
         st.altair_chart(chart, use_container_width=True)
         
