@@ -2,7 +2,7 @@ import pandas as pd
 from io import StringIO
 import streamlit as st
 from src.frame_processor import process_frame
-from db.db_utils import create_db, insert_focus_session, insert_focus_log
+from db.db_utils import create_db, insert_focus_session, insert_focus_log, get_session_by_id, get_sessions_by_name
 import time
 import cv2
 import tempfile
@@ -46,6 +46,46 @@ def create_altair_chart(df):
         color="Focus State:N"
     ).properties(title="Focus Over Time")
     return chart
+
+def display_session_report(session_data, focus_logs):
+    if not session_data or not focus_logs:
+        st.warning("No session data found")
+        return
+    
+    st.subheader("📊 Focus Report")
+    st.write(f"**Session Id:** {session_data['id']}")
+    st.write(f"**Name:** {session_data['name']}")
+    st.write(f"**Date:** {session_data['date']}")
+    
+    # Process focus logs
+    grouped_logs = [(log['start_time'], log['end_time'], log['is_focused']) for log in focus_logs]
+    if grouped_logs:
+        focus_df = create_data_frame(grouped_logs)
+        
+        # Calculate metrics
+        total_duration = sum(focus_df["Duration"])
+        focused_duration = sum(focus_df[focus_df["Focus State"] == "Focused"]["Duration"])
+        unfocused_duration = total_duration - focused_duration
+        focus_percentage = (focused_duration / total_duration) * 100 if total_duration > 0 else 0
+        
+        st.write(f"**Total Duration:** {total_duration:.2f} seconds")
+        st.write(f"**Focused Duration:** {focused_duration:.2f} seconds")
+        st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
+        st.write(f"**Focus Percentage:** {focus_percentage:.2f}%")
+        
+        chart = create_altair_chart(focus_df)
+        st.altair_chart(chart, use_container_width=True)
+        
+        # Convert to CSV
+        csv_data = focus_df.to_csv(index=False)
+        
+        # Provide a download button
+        st.download_button(
+            label="📥 Download Focus Report",
+            data=csv_data,
+            file_name=f"focus_report_session_{session_data['id']}.csv",
+            mime="text/csv"
+        )
 
 st.set_page_config(page_title = "AttenSense", layout = "centered")
 
@@ -146,6 +186,32 @@ st.markdown(
             color: black !important;              
             transform: scale(1.02);               
         }
+        
+        /* Session Details Box */
+        .session-details-box {
+            background-color: #f0f5ea;
+            border: 2px solid #C1CFA1;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        /* Tabs styling */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            background-color: #e6ebda !important;
+            border-radius: 4px 4px 0px 0px;
+            padding: 10px 20px;
+            border: 1px solid #C1CFA1;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background-color: #C1CFA1 !important;
+            color: black !important;
+        }
     </style>
     """,
     unsafe_allow_html=True
@@ -174,160 +240,243 @@ if "focus_log" not in st.session_state:
     st.session_state.focus_log = []
 if "name" not in st.session_state:
     st.session_state.name = None
+if "current_session_id" not in st.session_state:
+    st.session_state.current_session_id = None
+if "view" not in st.session_state:
+    st.session_state.view = "main"
+if "viewing_session_id" not in st.session_state:
+    st.session_state.viewing_session_id = None
 
-# Input Phase
-if st.session_state.analysis_phase == "idle":
-    # Enter user's name
-    st.session_state.name = st.text_input("Enter your name:")
-    # Upload Video or Use Webcam
-    video_source = st.radio("Choose Your Video Input:", ("Webcam", "Upload Video"))
-
-    uploaded_video = None
-    if video_source == "Upload Video":
-        uploaded_video = st.file_uploader("Upload a Video File (MP4, AVI, MOV)", type=["mp4", "avi", "mov"])
-
-    if st.button("Begin Attention Analysis"):
-        # Set session state for input method
-        if video_source == "Upload Video" and uploaded_video is None:
-            st.warning("Kindly upload a video to proceed with the analysis.")
-        else:
-            st.session_state.input_method = video_source
-            st.session_state.start_time = time.time()
-            st.session_state.analysis_phase = "analyzing"
-            if uploaded_video is not None:
-                temp_file = tempfile.NamedTemporaryFile(dir=uploads_path, delete=False, suffix=".mp4")
-                temp_file.write(uploaded_video.read())
-                temp_file.flush()
-                st.session_state.uploaded_video_path = temp_file.name
-            st.rerun()
-
-# If analysis has started, handle the input type
-if st.session_state.analysis_phase == "analyzing":
-    if st.button("End Attention Analysis"):
-        st.session_state.input_method = None
-        st.session_state.analysis_phase = "analysis_complete"
-        st.session_state.uploaded_video = None
-        st.rerun()
-
-    if st.session_state.input_method == "Webcam":
-        st.write("Live webcam stream activated. Stay focused!")
-        cap = cv2.VideoCapture(0)  # 0 for default webcam
-        stframe = st.empty()
-        focus_status_placeholder = st.empty()
-
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                st.error("Failed to capture image from webcam.")
-                break
-            
-            
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            
-            # Process frame and get focus status
-            frame, is_focused = process_frame(frame)
-
-            start_time = st.session_state.start_time
-            current_time = time.time() - start_time
-            st.session_state.focus_log.append((current_time, is_focused))
-
-            stframe.image(frame, channels="RGB")
-
-            # Display focus status
-            status_text = "Focused" if is_focused else "Not Focused"
-            color_class = "focused" if is_focused else "not-focused"
-
-            focus_status_placeholder.markdown(
-                f'<p class="focus-text {color_class}" style="font-size: 36px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
-                unsafe_allow_html=True
-            )
-            time.sleep(0.05)
-
-        cap.release()
-
-    elif st.session_state.uploaded_video_path is not None:
-        st.write("Processing your video... Sit tight!")
-        cap = cv2.VideoCapture(st.session_state.uploaded_video_path)
-        stframe = st.empty()
-        focus_status_placeholder = st.empty()
-
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                st.warning("Video processing complete.")
-                break
-
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            
-            # Process frame and get focus status
-            frame, is_focused = process_frame(frame)
-
-            start_time = st.session_state.start_time
-            current_time = time.time() - start_time
-            st.session_state.focus_log.append((current_time, is_focused))
-
-            stframe.image(frame, channels="RGB")
-            status_text = "Focused" if is_focused else "Not Focused"
-            color_class = "focused" if is_focused else "not-focused"
-
-            focus_status_placeholder.markdown(
-                f'<p class="focus-text {color_class}" style="font-size: 36px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
-                unsafe_allow_html=True
-            )
-            time.sleep(0.05)
-
-        cap.release()
-
-# Report phase
-if st.session_state.analysis_phase == "analysis_complete":
-    focus_log = st.session_state.focus_log
-    name = st.session_state.name
-    if focus_log:
-        frame_duration = 0.05  # 20 fps
-        total_duration = len(focus_log) * frame_duration
-        focused_duration = sum(1 for _, f in focus_log if f) * frame_duration
-        unfocused_duration = total_duration - focused_duration
-        focus_percentage = (focused_duration / total_duration) * 100 if total_duration > 0 else 0
-
-        grouped_focus_log = group_focus_log(focus_log)
-        focus_df = create_data_frame(grouped_focus_log)
-        chart = create_altair_chart(focus_df)
-
-        # Inserting focus session
-        session_id = insert_focus_session(name)
-
-        # Inserting focus logs
-        for (start, end, focus_state) in grouped_focus_log:
-            insert_focus_log(session_id, start, end, focus_state)
-
-        st.subheader("📊 Focus Report")
-        st.write(f"**Session Id:** {session_id}")
-        st.write(f"**Name:** {name}")
-        st.write(f"**Total Duration:** {total_duration:.2f} seconds")
-        st.write(f"**Focused Duration:** {focused_duration:.2f} seconds")
-        st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
-        st.write(f"**Focus Percentage:** {focus_percentage:.2f}%")
-
-        st.altair_chart(chart, use_container_width=True)
-        
-        # Convert to CSV
-        csv_data = focus_df.to_csv(index = False)
-
-        # Provide a download button
-        st.download_button(
-            label = "📥 Download Focus Report",
-            data = csv_data,
-            file_name = "focus_report.csv",
-            mime = "text/csv"
-        )
+# Main app navigation
+if st.session_state.view == "main":
+    tabs = st.tabs(["New Analysis", "View Previous Sessions"])
     
-    if st.button("Return to Home"):
-        st.session_state.analysis_phase = "idle"
-        st.session_state.focus_log = []
-        st.session_state.uploaded_video_path = None
-        st.session_state.focus_log = []
-        st.session_state.uploaded_video_path = None
-        st.session_state.name = None
+    with tabs[0]:
+        # Input Phase
+        if st.session_state.analysis_phase == "idle":
+            # Enter user's name
+            st.session_state.name = st.text_input("Enter your name:")
+            # Upload Video or Use Webcam
+            video_source = st.radio("Choose Your Video Input:", ("Webcam", "Upload Video"))
+
+            uploaded_video = None
+            if video_source == "Upload Video":
+                uploaded_video = st.file_uploader("Upload a Video File (MP4, AVI, MOV)", type=["mp4", "avi", "mov"])
+
+            if st.button("Begin Attention Analysis"):
+                # Set session state for input method
+                if video_source == "Upload Video" and uploaded_video is None:
+                    st.warning("Kindly upload a video to proceed with the analysis.")
+                elif not st.session_state.name:
+                    st.warning("Please enter your name to proceed.")
+                else:
+                    st.session_state.input_method = video_source
+                    st.session_state.start_time = time.time()
+                    st.session_state.analysis_phase = "analyzing"
+                    if uploaded_video is not None:
+                        temp_file = tempfile.NamedTemporaryFile(dir=uploads_path, delete=False, suffix=".mp4")
+                        temp_file.write(uploaded_video.read())
+                        temp_file.flush()
+                        st.session_state.uploaded_video_path = temp_file.name
+                    st.rerun()
+
+        # If analysis has started, handle the input type
+        if st.session_state.analysis_phase == "analyzing":
+            if st.button("End Attention Analysis"):
+                # Generate session ID when ending analysis
+                st.session_state.current_session_id = insert_focus_session(st.session_state.name)
+                
+                # Insert focus logs
+                grouped_focus_logs = group_focus_log(st.session_state.focus_log)
+                for (start, end, focus_state) in grouped_focus_logs:
+                    insert_focus_log(st.session_state.current_session_id, start, end, focus_state)
+                
+                st.session_state.input_method = None
+                st.session_state.analysis_phase = "analysis_complete"
+                st.session_state.uploaded_video = None
+                st.rerun()
+
+            if st.session_state.input_method == "Webcam":
+                st.write("Live webcam stream activated. Stay focused!")
+                cap = cv2.VideoCapture(0)  # 0 for default webcam
+                stframe = st.empty()
+                focus_status_placeholder = st.empty()
+
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        st.error("Failed to capture image from webcam.")
+                        break
+                    
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    
+                    # Process frame and get focus status
+                    frame, is_focused = process_frame(frame)
+
+                    start_time = st.session_state.start_time
+                    current_time = time.time() - start_time
+                    st.session_state.focus_log.append((current_time, is_focused))
+
+                    stframe.image(frame, channels="RGB")
+
+                    # Display focus status
+                    status_text = "Focused" if is_focused else "Not Focused"
+                    color_class = "focused" if is_focused else "not-focused"
+
+                    focus_status_placeholder.markdown(
+                        f'<p class="focus-text {color_class}" style="font-size: 36px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
+                        unsafe_allow_html=True
+                    )
+                    time.sleep(0.05)
+
+                cap.release()
+
+            elif st.session_state.uploaded_video_path is not None:
+                st.write("Processing your video... Sit tight!")
+                cap = cv2.VideoCapture(st.session_state.uploaded_video_path)
+                stframe = st.empty()
+                focus_status_placeholder = st.empty()
+
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        st.warning("Video processing complete.")
+                        break
+
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    
+                    # Process frame and get focus status
+                    frame, is_focused = process_frame(frame)
+
+                    start_time = st.session_state.start_time
+                    current_time = time.time() - start_time
+                    st.session_state.focus_log.append((current_time, is_focused))
+
+                    stframe.image(frame, channels="RGB")
+                    status_text = "Focused" if is_focused else "Not Focused"
+                    color_class = "focused" if is_focused else "not-focused"
+
+                    focus_status_placeholder.markdown(
+                        f'<p class="focus-text {color_class}" style="font-size: 36px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
+                        unsafe_allow_html=True
+                    )
+                    time.sleep(0.05)
+
+                cap.release()
+
+        # Report phase
+        if st.session_state.analysis_phase == "analysis_complete":
+            focus_log = st.session_state.focus_log
+            name = st.session_state.name
+            session_id = st.session_state.current_session_id
+            
+            if focus_log:
+                frame_duration = 0.05  # 20 fps
+                total_duration = len(focus_log) * frame_duration
+                focused_duration = sum(1 for _, f in focus_log if f) * frame_duration
+                unfocused_duration = total_duration - focused_duration
+                focus_percentage = (focused_duration / total_duration) * 100 if total_duration > 0 else 0
+
+                grouped_focus_log = group_focus_log(focus_log)
+                focus_df = create_data_frame(grouped_focus_log)
+                chart = create_altair_chart(focus_df)
+
+                # Display session ID in a highlighted box
+                st.markdown(
+                    f"""
+                    <div class="session-details-box">
+                        <h3>Session Complete!</h3>
+                        <p>Your session has been saved with the following details:</p>
+                        <p><strong>Session ID:</strong> {session_id}</p>
+                        <p><strong>Name:</strong> {name}</p>
+                        <p>You can use these details to retrieve your session later.</p>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
+
+                st.subheader("📊 Focus Report")
+                st.write(f"**Session Id:** {session_id}")
+                st.write(f"**Name:** {name}")
+                st.write(f"**Total Duration:** {total_duration:.2f} seconds")
+                st.write(f"**Focused Duration:** {focused_duration:.2f} seconds")
+                st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
+                st.write(f"**Focus Percentage:** {focus_percentage:.2f}%")
+
+                st.altair_chart(chart, use_container_width=True)
+                
+                # Convert to CSV
+                csv_data = focus_df.to_csv(index = False)
+
+                # Provide a download button
+                st.download_button(
+                    label = "📥 Download Focus Report",
+                    data = csv_data,
+                    file_name = f"focus_report_session_{session_id}.csv",
+                    mime = "text/csv"
+                )
+            
+            if st.button("Return to Home"):
+                st.session_state.analysis_phase = "idle"
+                st.session_state.focus_log = []
+                st.session_state.uploaded_video_path = None
+                st.session_state.name = None
+                st.session_state.current_session_id = None
+                st.rerun()
+    
+    with tabs[1]:
+        st.subheader("Retrieve Previous Session")
+        
+        search_method = st.radio("Search by:", ["Name", "Session ID"])
+        
+        if search_method == "Name":
+            search_name = st.text_input("Enter Name:")
+            if st.button("Find Sessions") and search_name:
+                sessions = get_sessions_by_name(search_name)
+                if sessions:
+                    st.success(f"Found {len(sessions)} sessions for {search_name}")
+                    for session in sessions:
+                        session_col1, session_col2 = st.columns([3, 1])
+                        with session_col1:
+                            st.markdown(f"""
+                            **Session ID:** {session['id']}<br>
+                            **Date:** {session['date']}
+                            """, unsafe_allow_html=True)
+                        with session_col2:
+                            if st.button(f"View Details", key=f"view_{session['id']}"):
+                                st.session_state.view = "session_details"
+                                st.session_state.viewing_session_id = session['id']
+                                st.rerun()
+                else:
+                    st.warning(f"No sessions found for {search_name}")
+        
+        else:  # Session ID
+            session_id = st.text_input("Enter Session ID:")
+            if st.button("Find Session") and session_id:
+                try:
+                    session_id = int(session_id)
+                    session = get_session_by_id(session_id)
+                    if session:
+                        st.success(f"Session found for {session['name']}")
+                        if st.button("View Details"):
+                            st.session_state.view = "session_details"
+                            st.session_state.viewing_session_id = session_id
+                            st.rerun()
+                    else:
+                        st.warning(f"No session found with ID {session_id}")
+                except ValueError:
+                    st.error("Session ID must be a number")
+
+elif st.session_state.view == "session_details":
+    session_id = st.session_state.viewing_session_id
+    session_data = get_session_by_id(session_id)
+    focus_logs = get_session_by_id(session_id, include_logs=True)['logs'] if session_data else []
+    
+    if st.button("← Back to Main"):
+        st.session_state.view = "main"
         st.rerun()
+    
+    if session_data:
+        display_session_report(session_data, focus_logs)
+    else:
+        st.error(f"Session with ID {session_id} not found")
