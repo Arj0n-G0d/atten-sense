@@ -83,10 +83,10 @@ def display_session_report(session_id, name, date, grouped_focus_logs):
     )
 
     st.subheader("📊 Focus Report")
-    st.write(f"**Total Duration:** {total_duration:.2f} seconds")
-    st.write(f"**Focused Duration:** {focused_duration:.2f} seconds")
-    st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
-    st.write(f"**Focus Percentage:** {focus_percentage:.2f}%")
+    st.write(f"*Total Duration:* {total_duration:.2f} seconds")
+    st.write(f"*Focused Duration:* {focused_duration:.2f} seconds")
+    st.write(f"*Unfocused Duration:* {unfocused_duration:.2f} seconds")
+    st.write(f"*Focus Percentage:* {focus_percentage:.2f}%")
 
     st.altair_chart(chart, use_container_width=True)
     
@@ -412,8 +412,8 @@ if st.session_state.view == "main":
                         session_col1, session_col2 = st.columns([3, 1])
                         with session_col1:
                             st.markdown(f"""
-                            **Session ID:** {session['session_id']}<br>
-                            **Date:** {session['date']}
+                            *Session ID:* {session['session_id']}<br>
+                            *Date:* {session['date']}
                             """, unsafe_allow_html=True)
                 else:
                     st.warning(f"No sessions found for {search_name}")
