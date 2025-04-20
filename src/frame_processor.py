@@ -9,7 +9,7 @@ model = YOLO("yolov8n.pt")
 
 # Constants
 PHONE_USAGE_THRESHOLD = 0.5 # Seconds before marking as "Using Phone"
-BLINK_THRESHOLD = 0.25  # Seconds - maximum allowed blink duration before considered unfocused
+BLINK_THRESHOLD = 0.5  # Seconds - maximum allowed blink duration before considered unfocused
 EYE_AR_THRESHOLD = 0.35  # Eye aspect ratio threshold for determining closed eyes
 
 # Global variables for tracking
