@@ -21,12 +21,12 @@ def group_focus_log(focus_log):
 
         # If state changes, store the previous segment
         if current_state != state:
-            grouped_log.append((start_time, focus_log[i - 1][0], state))  # (start, end, state)
+            grouped_log.append((start_time, current_time, state))  # (start, end, state)
             start_time = current_time  # Update start time for the new state
             state = current_state  # Update state
 
     # Append last segment
-    grouped_log.append((start_time, focus_log[-1][0], state))
+    grouped_log.append((start_time, focus_log[-1][0] + 0.05, state))
     
     return grouped_log
 
@@ -47,45 +47,59 @@ def create_altair_chart(df):
     ).properties(title="Focus Over Time")
     return chart
 
-def display_session_report(session_data, focus_logs):
-    if not session_data or not focus_logs:
+def display_session_report(session_id, name, date, grouped_focus_logs):
+    if not grouped_focus_logs:
         st.warning("No session data found")
         return
-    
+    total_duration = 0
+    focused_duration = 0
+    unfocused_duration = 0
+    for i in range(len(grouped_focus_logs)):
+        start = float(grouped_focus_logs[i][0])
+        end = float(grouped_focus_logs[i][1])
+        focus_state = bool(grouped_focus_logs[i][2])
+        grouped_focus_logs[i] = (start, end, focus_state)
+
+        if focus_state:
+            focused_duration += end - start
+        else:
+            unfocused_duration += end - start
+        total_duration += end - start
+    focus_percentage = (focused_duration / total_duration) * 100 if total_duration > 0 else 0
+
+    focus_df = create_data_frame(grouped_focus_logs)
+    chart = create_altair_chart(focus_df)
+
+    # Display session ID in a highlighted box
+    st.markdown(
+        f"""
+        <div class="session-details-box">
+            <p><strong>Session ID:</strong> {session_id}</p>
+            <p><strong>Name:</strong> {name}</p>
+            <p><strong>Date:</strong> {date}</p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+
     st.subheader("📊 Focus Report")
-    st.write(f"**Session Id:** {session_data['id']}")
-    st.write(f"**Name:** {session_data['name']}")
-    st.write(f"**Date:** {session_data['date']}")
+    st.write(f"**Total Duration:** {total_duration:.2f} seconds")
+    st.write(f"**Focused Duration:** {focused_duration:.2f} seconds")
+    st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
+    st.write(f"**Focus Percentage:** {focus_percentage:.2f}%")
+
+    st.altair_chart(chart, use_container_width=True)
     
-    # Process focus logs
-    grouped_logs = [(log['start_time'], log['end_time'], log['is_focused']) for log in focus_logs]
-    if grouped_logs:
-        focus_df = create_data_frame(grouped_logs)
-        
-        # Calculate metrics
-        total_duration = sum(focus_df["Duration"])
-        focused_duration = sum(focus_df[focus_df["Focus State"] == "Focused"]["Duration"])
-        unfocused_duration = total_duration - focused_duration
-        focus_percentage = (focused_duration / total_duration) * 100 if total_duration > 0 else 0
-        
-        st.write(f"**Total Duration:** {total_duration:.2f} seconds")
-        st.write(f"**Focused Duration:** {focused_duration:.2f} seconds")
-        st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
-        st.write(f"**Focus Percentage:** {focus_percentage:.2f}%")
-        
-        chart = create_altair_chart(focus_df)
-        st.altair_chart(chart, use_container_width=True)
-        
-        # Convert to CSV
-        csv_data = focus_df.to_csv(index=False)
-        
-        # Provide a download button
-        st.download_button(
-            label="📥 Download Focus Report",
-            data=csv_data,
-            file_name=f"focus_report_session_{session_data['id']}.csv",
-            mime="text/csv"
-        )
+    # Convert to CSV
+    csv_data = focus_df.to_csv(index = False)
+
+    # Provide a download button
+    st.download_button(
+        label = "📥 Download Focus Report",
+        data = csv_data,
+        file_name = f"focus_report_session_{session_id}.csv",
+        mime = "text/csv"
+    )
 
 st.set_page_config(page_title = "AttenSense", layout = "centered")
 
@@ -284,7 +298,7 @@ if st.session_state.view == "main":
         if st.session_state.analysis_phase == "analyzing":
             if st.button("End Attention Analysis"):
                 # Generate session ID when ending analysis
-                st.session_state.current_session_id = insert_focus_session(st.session_state.name)
+                st.session_state.current_session_id, st.session_state.current_date = insert_focus_session(st.session_state.name)
                 
                 # Insert focus logs
                 grouped_focus_logs = group_focus_log(st.session_state.focus_log)
@@ -367,54 +381,13 @@ if st.session_state.view == "main":
         # Report phase
         if st.session_state.analysis_phase == "analysis_complete":
             focus_log = st.session_state.focus_log
+            grouped_focus_logs = group_focus_log(focus_log)
             name = st.session_state.name
             session_id = st.session_state.current_session_id
+            date = st.session_state.current_date
             
-            if focus_log:
-                frame_duration = 0.05  # 20 fps
-                total_duration = len(focus_log) * frame_duration
-                focused_duration = sum(1 for _, f in focus_log if f) * frame_duration
-                unfocused_duration = total_duration - focused_duration
-                focus_percentage = (focused_duration / total_duration) * 100 if total_duration > 0 else 0
-
-                grouped_focus_log = group_focus_log(focus_log)
-                focus_df = create_data_frame(grouped_focus_log)
-                chart = create_altair_chart(focus_df)
-
-                # Display session ID in a highlighted box
-                st.markdown(
-                    f"""
-                    <div class="session-details-box">
-                        <h3>Session Complete!</h3>
-                        <p>Your session has been saved with the following details:</p>
-                        <p><strong>Session ID:</strong> {session_id}</p>
-                        <p><strong>Name:</strong> {name}</p>
-                        <p>You can use these details to retrieve your session later.</p>
-                    </div>
-                    """, 
-                    unsafe_allow_html=True
-                )
-
-                st.subheader("📊 Focus Report")
-                st.write(f"**Session Id:** {session_id}")
-                st.write(f"**Name:** {name}")
-                st.write(f"**Total Duration:** {total_duration:.2f} seconds")
-                st.write(f"**Focused Duration:** {focused_duration:.2f} seconds")
-                st.write(f"**Unfocused Duration:** {unfocused_duration:.2f} seconds")
-                st.write(f"**Focus Percentage:** {focus_percentage:.2f}%")
-
-                st.altair_chart(chart, use_container_width=True)
-                
-                # Convert to CSV
-                csv_data = focus_df.to_csv(index = False)
-
-                # Provide a download button
-                st.download_button(
-                    label = "📥 Download Focus Report",
-                    data = csv_data,
-                    file_name = f"focus_report_session_{session_id}.csv",
-                    mime = "text/csv"
-                )
+            if grouped_focus_logs:
+                display_session_report(session_id, name, date, grouped_focus_logs)
             
             if st.button("Return to Home"):
                 st.session_state.analysis_phase = "idle"
@@ -428,8 +401,8 @@ if st.session_state.view == "main":
         st.subheader("Retrieve Previous Session")
         
         search_method = st.radio("Search by:", ["Name", "Session ID"])
-        
-        if search_method == "Name":
+
+        if search_method == "Name": # Name
             search_name = st.text_input("Enter Name:")
             if st.button("Find Sessions") and search_name:
                 sessions = get_sessions_by_name(search_name)
@@ -439,44 +412,24 @@ if st.session_state.view == "main":
                         session_col1, session_col2 = st.columns([3, 1])
                         with session_col1:
                             st.markdown(f"""
-                            **Session ID:** {session['id']}<br>
+                            **Session ID:** {session['session_id']}<br>
                             **Date:** {session['date']}
                             """, unsafe_allow_html=True)
-                        with session_col2:
-                            if st.button(f"View Details", key=f"view_{session['id']}"):
-                                st.session_state.view = "session_details"
-                                st.session_state.viewing_session_id = session['id']
-                                st.rerun()
                 else:
                     st.warning(f"No sessions found for {search_name}")
         
-        else:  # Session ID
+        elif search_method == "Session ID":  # Session ID
             session_id = st.text_input("Enter Session ID:")
             if st.button("Find Session") and session_id:
-                try:
-                    session_id = int(session_id)
-                    session = get_session_by_id(session_id)
-                    if session:
-                        st.success(f"Session found for {session['name']}")
-                        if st.button("View Details"):
-                            st.session_state.view = "session_details"
-                            st.session_state.viewing_session_id = session_id
-                            st.rerun()
-                    else:
-                        st.warning(f"No session found with ID {session_id}")
-                except ValueError:
-                    st.error("Session ID must be a number")
-
-elif st.session_state.view == "session_details":
-    session_id = st.session_state.viewing_session_id
-    session_data = get_session_by_id(session_id)
-    focus_logs = get_session_by_id(session_id, include_logs=True)['logs'] if session_data else []
-    
-    if st.button("← Back to Main"):
-        st.session_state.view = "main"
-        st.rerun()
-    
-    if session_data:
-        display_session_report(session_data, focus_logs)
-    else:
-        st.error(f"Session with ID {session_id} not found")
+                session_id = int(session_id)
+                session = get_session_by_id(session_id, True)
+                if session:
+                    st.success(f"Session found for {session['name']}")
+                    display_session_report(
+                        session['session_id'],
+                        session['name'],
+                        session['date'],
+                        session['logs']
+                    )
+                else:
+                    st.warning(f"No session found with ID {session_id}")

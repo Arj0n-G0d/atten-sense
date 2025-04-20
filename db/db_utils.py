@@ -1,5 +1,3 @@
-# This is the updated db/db_utils.py file
-
 import sqlite3
 from datetime import date
 
@@ -36,9 +34,14 @@ def insert_focus_session(name):
     # Insert session and get the ID
     cursor.execute("INSERT INTO focus_sessions (name, date) VALUES (?, CURRENT_TIMESTAMP)", (name,))
     session_id = cursor.lastrowid
+
+    # Get date
+    cursor.execute("SELECT date FROM focus_sessions WHERE session_id = ?", (session_id,))
+    session_date = cursor.fetchone()[0]
+
     conn.commit()
     conn.close()
-    return session_id
+    return session_id, session_date
 
 def insert_focus_log(session_id, start, end, focus_state):
     conn = sqlite3.connect("atten_sense.db")
@@ -66,7 +69,7 @@ def get_session_by_id(session_id, include_logs=False):
     
     # Get the session details
     cursor.execute("""
-        SELECT session_id as id, name, date 
+        SELECT session_id, name, date 
         FROM focus_sessions 
         WHERE session_id = ?
     """, (session_id,))
@@ -83,19 +86,17 @@ def get_session_by_id(session_id, include_logs=False):
     if include_logs:
         # Get the focus logs for this session
         cursor.execute("""
-            SELECT start_time as start_time, end_time as end_time, 
-                   focus_state as is_focused
+            SELECT start, end, 
+                   focus_state
             FROM focus_logs
             WHERE session_id = ?
-            ORDER BY start_time
+            ORDER BY start
         """, (session_id,))
         
         # Convert focus_state to boolean
         logs = []
         for log in cursor.fetchall():
-            log_dict = dict(log)
-            log_dict['is_focused'] = (log_dict['is_focused'] == 'Focused')
-            logs.append(log_dict)
+            logs.append((log['start'], log['end'], log['focus_state'] == 'Focused'))
             
         session_dict['logs'] = logs
     
@@ -109,7 +110,7 @@ def get_sessions_by_name(name):
     cursor = conn.cursor()
     
     cursor.execute("""
-        SELECT session_id as id, name, date
+        SELECT session_id, name, date
         FROM focus_sessions
         WHERE name LIKE ?
         ORDER BY date DESC
