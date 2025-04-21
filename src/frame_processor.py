@@ -63,6 +63,7 @@ def process_frame(frame):
     Returns: processed frame, is_focused flag
     """
     global phone_detected_time, blink_start_time, is_blinking, eyes_closed_status
+    currTime = time.time()
     
     is_focused = True  # Start with assumption of focused, will update based on conditions
     (h, w) = frame.shape[:2]  # Getting height and width of captured frame
@@ -89,8 +90,8 @@ def process_frame(frame):
     # Check phone usage time
     if phone_detected:
         if phone_detected_time == 0:
-            phone_detected_time = time.time()
-        elif time.time() - phone_detected_time > PHONE_USAGE_THRESHOLD:
+            phone_detected_time = currTime
+        elif currTime - phone_detected_time > PHONE_USAGE_THRESHOLD:
             cv2.putText(frame, "Using Phone!", (50, 50), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
             # Mark as not focused when using phone
@@ -213,11 +214,11 @@ def process_frame(frame):
                     
                     # Start or continue tracking blink duration
                     if not is_blinking:
-                        blink_start_time = time.time()
+                        blink_start_time = currTime
                         is_blinking = True
                     
                     # Calculate how long eyes have been closed
-                    blink_duration = time.time() - blink_start_time
+                    blink_duration = currTime - blink_start_time
                     
                     # Check if eyes closed longer than threshold
                     if blink_duration > BLINK_THRESHOLD:
@@ -238,19 +239,19 @@ def process_frame(frame):
 
     # Handle case when face is detected but no eye landmarks found
     if face_detected and eyes_are_closed and is_blinking:
-        blink_duration = time.time() - blink_start_time
+        blink_duration = currTime - blink_start_time
         if blink_duration > BLINK_THRESHOLD:
             is_focused = False
 
     # Add overall status display to frame
     status_text = "Status: "
-    if phone_detected and time.time() - phone_detected_time > PHONE_USAGE_THRESHOLD:
+    if phone_detected and currTime - phone_detected_time > PHONE_USAGE_THRESHOLD:
         status_text += "Using Phone (Not Focused)"
         status_color = (0, 0, 255)  # Red
     elif not face_detected:
         status_text += "No Face (Not Focused)"
         status_color = (0, 0, 255)  # Red
-    elif eyes_are_closed and is_blinking and (time.time() - blink_start_time > BLINK_THRESHOLD):
+    elif eyes_are_closed and is_blinking and (currTime - blink_start_time > BLINK_THRESHOLD):
         status_text += "Eyes Closed (Not Focused)"
         status_color = (0, 0, 255)  # Red
     elif not is_focused:
@@ -262,7 +263,7 @@ def process_frame(frame):
     
     # Debug information - show blink duration
     if is_blinking:
-        blink_duration = time.time() - blink_start_time
+        blink_duration = currTime - blink_start_time
         cv2.putText(frame, f"Blink time: {blink_duration:.2f}s", (10, 140), 
                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         
