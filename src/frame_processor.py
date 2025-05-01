@@ -261,6 +261,54 @@ def process_frame(frame):
                     blink_start_time = 0
                     cv2.putText(frame, "Eyes Open", (10, 80), 
                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                
+                LEFT_IRIS = [474, 475, 476, 477]
+                RIGHT_IRIS = [469, 470, 471, 472]
+
+                # Extract iris landmarks
+                left_iris = []
+                right_iris = []
+                
+                for idx in LEFT_IRIS:
+                    landmark = face_landmarks.landmark[idx]
+                    x = int(landmark.x * w)
+                    y = int(landmark.y * h)
+                    left_iris.append((x, y))
+                
+                for idx in RIGHT_IRIS:
+                    landmark = face_landmarks.landmark[idx]
+                    x = int(landmark.x * w)
+                    y = int(landmark.y * h)
+                    right_iris.append((x, y))
+
+                # Calculate iris centers
+                def iris_center(iris):
+                    x = int(np.mean([pt[0] for pt in iris]))
+                    y = int(np.mean([pt[1] for pt in iris]))
+                    return x, y
+
+                l_iris_center = iris_center(left_iris)
+                r_iris_center = iris_center(right_iris)
+
+                # Draw circles
+                cv2.circle(frame, l_iris_center, 2, (255, 105, 65), 1)
+                cv2.circle(frame, r_iris_center, 2, (255, 105, 65), 1)
+
+                # Gaze logic (Left Eye only)
+                horizontal_gaze_ratio = (euclidean_distance(l_iris_center, left_eye_points[0]) / (euclidean_distance(left_eye_points[0], left_eye_points[3]) + 1e-6))
+
+                if horizontal_gaze_ratio >= 0.50 and horizontal_gaze_ratio <= 0.70:
+                    horizontal_gaze = "Center"
+                elif horizontal_gaze_ratio < 0.50:
+                    horizontal_gaze = "Right"
+                else:
+                    horizontal_gaze = "Left"
+
+                cv2.putText(frame, f"Gaze: {horizontal_gaze}", (30, 50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+                if horizontal_gaze != "Center":
+                    is_focused = False
 
     # Handle case when face is detected but no eye landmarks found
     if face_detected and eyes_are_closed and is_blinking:
@@ -278,6 +326,9 @@ def process_frame(frame):
         status_color = (0, 0, 255)  # Red
     elif eyes_are_closed and is_blinking and (currTime - blink_start_time > BLINK_THRESHOLD):
         status_text += "Eyes Closed (Not Focused)"
+        status_color = (0, 0, 255)  # Red
+    elif horizontal_gaze != "Center":
+        status_text += "Looking Away"
         status_color = (0, 0, 255)  # Red
     elif not is_focused:
         status_text += "Not Focused"
