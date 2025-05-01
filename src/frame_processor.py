@@ -8,12 +8,12 @@ from ultralytics import YOLO
 model = YOLO("yolov8n.pt")
 
 # Constants
-PHONE_USAGE_THRESHOLD = 0.5 # Seconds before marking as "Using Phone"
-BLINK_THRESHOLD = 0.5  # Seconds - maximum allowed blink duration before considered unfocused
-EYE_AR_THRESHOLD = 0.25  # Eye aspect ratio threshold for determining closed eyes
+PHONE_USAGE_THRESHOLD = 2 # Seconds before marking as "Using Phone" (Unfocused)
+BLINK_THRESHOLD = 1  # Seconds before marking as "Eyes Closed" (Unfocused)
+EYE_AR_THRESHOLD = 0.20  # Eye aspect ratio threshold for determining closed eyes
 
 # Global variables for tracking
-phone_detected_time = 0
+last_phone_detected_time = 0
 blink_start_time = 0
 is_blinking = False
 eyes_closed_status = False  # New global variable to track eye closure status
@@ -22,6 +22,7 @@ eyes_closed_status = False  # New global variable to track eye closure status
 mp_face_detection = mp.solutions.face_detection
 mp_face_mesh = mp.solutions.face_mesh
 mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
 
 # Initialize face detection and face mesh
 face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
@@ -36,12 +37,16 @@ face_mesh = mp_face_mesh.FaceMesh(
 # Drawing specifications
 drawing_spec = mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=1, circle_radius=1)
 
+""" Calculate Euclidean distance between two points """
 def euclidean_distance(point1, point2):
-    """Calculate Euclidean distance between two points"""
     return np.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
 
+""" Calculate Manhattan distance between two points """
+def manhattan_distance(point1, point2):
+    return abs(point1[0] - point2[0]) + abs(point1[1] - point2[1]) 
+
+""" Calculate the eye aspect ratio from eye landmarks """
 def eye_aspect_ratio(eye_points):
-    """Calculate the eye aspect ratio from eye landmarks"""
     # Compute the euclidean distances between the horizontal landmarks
     A = euclidean_distance(eye_points[1], eye_points[5])
     B = euclidean_distance(eye_points[2], eye_points[4])
@@ -57,16 +62,15 @@ def eye_aspect_ratio(eye_points):
     ear = (A + B) / (2.0 * C)
     return ear
 
-def process_frame(frame):
-    """
+"""
     Process frame for face attention and phone detection.
     Returns: processed frame, is_focused flag
-    """
-    global phone_detected_time, blink_start_time, is_blinking, eyes_closed_status
+"""
+def process_frame(frame):
+    global last_phone_detected_time, blink_start_time, is_blinking, eyes_closed_status
     currTime = time.time()
     
     is_focused = True  # Start with assumption of focused, will update based on conditions
-    (h, w) = frame.shape[:2]  # Getting height and width of captured frame
     
     # Convert frame to RGB for MediaPipe
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -89,15 +93,15 @@ def process_frame(frame):
 
     # Check phone usage time
     if phone_detected:
-        if phone_detected_time == 0:
-            phone_detected_time = currTime
-        elif currTime - phone_detected_time > PHONE_USAGE_THRESHOLD:
+        if last_phone_detected_time == 0:
+            last_phone_detected_time = currTime
+        elif currTime - last_phone_detected_time > PHONE_USAGE_THRESHOLD:
             cv2.putText(frame, "Using Phone!", (50, 50), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
             # Mark as not focused when using phone
             is_focused = False
     else:
-        phone_detected_time = 0  # Reset timer if phone is not detected
+        last_phone_detected_time = 0  # Reset time if phone is not detected
 
     # Face Detection using MediaPipe
     face_detection_results = face_detection.process(rgb_frame)
@@ -134,30 +138,53 @@ def process_frame(frame):
     # Face Mesh processing for eye tracking
     if face_detected:
         mesh_results = face_mesh.process(rgb_frame)
-        
+        (h, w) = frame.shape[:2]  # Getting height and width of frame
+        """
+            IMPORTANT: (h, w) = frame.shape[:2] at the beginning of the function != (h, w) = frame.shape[:2] here
+            IDK whether frame got changed in some function or something.
+            But now, h and w are correct and hence landmark.x * w and landmark.y * h give correct coordinates over frame.
+        """
         if mesh_results.multi_face_landmarks:
             for face_landmarks in mesh_results.multi_face_landmarks:
+                # mp_drawing.draw_landmarks(
+                #     image=frame,
+                #     landmark_list=face_landmarks,
+                #     connections=mp_face_mesh.FACEMESH_TESSELATION,  # Mesh triangles
+                #     landmark_drawing_spec=None,  # Set to None to only draw mesh
+                #     connection_drawing_spec=mp_drawing_styles
+                #         .get_default_face_mesh_tesselation_style()
+                # )
                 # Eye landmark indices for MediaPipe Face Mesh
+
                 # LEFT_EYE landmarks for EAR calculation
                 LEFT_EYE = [362, 385, 387, 263, 373, 380]
                 # RIGHT_EYE landmarks for EAR calculation
                 RIGHT_EYE = [33, 160, 158, 133, 153, 144]
                 
-                # Additional landmarks for drawing eye contours (LEFT EYE)
-                LEFT_EYE_CONTOUR = [
-                    # Upper eyelid
-                    362, 382, 381, 380, 374, 373, 390, 249, 263,
-                    # Lower eyelid
-                    466, 388, 387, 386, 385, 384, 398, 362
-                ]
+                # # Additional landmarks for drawing eye contours (LEFT EYE)
+                # LEFT_EYE_CONTOUR = [
+                #     # Upper eyelid
+                #     362, 382, 381, 380, 374, 373, 390, 249, 263,
+                #     # Lower eyelid
+                #     466, 388, 387, 386, 385, 384, 398, 362
+                # ]
+                # LEFT_EYE_CONTOUR = [
+                #     # Upper eyelid
+                #     362, 382, 381, 380, 374, 373, 390, 249, 263,
+                #     # Lower eyelid
+                #     466, 388, 387, 386, 385, 384, 398, 362
+                # ]
+
+                # LEFT_EYE_CONTOUR = [33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144]
+
                 
-                # Additional landmarks for drawing eye contours (RIGHT EYE)
-                RIGHT_EYE_CONTOUR = [
-                    # Upper eyelid
-                    33, 7, 163, 144, 145, 153, 154, 155, 133,
-                    # Lower eyelid
-                    246, 161, 160, 159, 158, 157, 173, 33
-                ]
+                # # Additional landmarks for drawing eye contours (RIGHT EYE)
+                # RIGHT_EYE_CONTOUR = [
+                #     # Upper eyelid
+                #     33, 7, 163, 144, 145, 153, 154, 155, 133,
+                #     # Lower eyelid
+                #     246, 161, 160, 159, 158, 157, 173, 33
+                # ]
                 
                 # Extract eye landmarks for EAR calculation
                 left_eye_points = []
@@ -168,34 +195,32 @@ def process_frame(frame):
                     x = int(landmark.x * w)
                     y = int(landmark.y * h)
                     left_eye_points.append((x, y))
-                    cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
                 
                 for idx in RIGHT_EYE:
                     landmark = face_landmarks.landmark[idx]
                     x = int(landmark.x * w)
                     y = int(landmark.y * h)
                     right_eye_points.append((x, y))
-                    cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
                 
-                # Extract eye contour landmarks for drawing
-                left_contour_points = []
-                right_contour_points = []
+                # # Extract eye contour landmarks for drawing
+                # left_contour_points = []
+                # right_contour_points = []
                 
-                for idx in LEFT_EYE_CONTOUR:
-                    landmark = face_landmarks.landmark[idx]
-                    x = int(landmark.x * w)
-                    y = int(landmark.y * h)
-                    left_contour_points.append((x, y))
+                # for idx in LEFT_EYE_CONTOUR:
+                #     landmark = face_landmarks.landmark[idx]
+                #     x = int(landmark.x * w)
+                #     y = int(landmark.y * h)
+                #     left_contour_points.append((x, y))
                 
-                for idx in RIGHT_EYE_CONTOUR:
-                    landmark = face_landmarks.landmark[idx]
-                    x = int(landmark.x * w)
-                    y = int(landmark.y * h)
-                    right_contour_points.append((x, y))
-                
+                # for idx in RIGHT_EYE_CONTOUR:
+                #     landmark = face_landmarks.landmark[idx]
+                #     x = int(landmark.x * w)
+                #     y = int(landmark.y * h)
+                #     right_contour_points.append((x, y))
+
                 # Draw eye contours with detailed lines
-                cv2.polylines(frame, [np.array(left_contour_points)], True, (255, 105, 65), 2)
-                cv2.polylines(frame, [np.array(right_contour_points)], True, (255, 105, 65), 2)
+                cv2.polylines(frame, [np.array(left_eye_points)], True, (255, 105, 65), 1)
+                cv2.polylines(frame, [np.array(right_eye_points)], True, (255, 105, 65), 1)
                 
                 # Calculate EAR for both eyes
                 left_ear = eye_aspect_ratio(left_eye_points)
@@ -245,7 +270,7 @@ def process_frame(frame):
 
     # Add overall status display to frame
     status_text = "Status: "
-    if phone_detected and currTime - phone_detected_time > PHONE_USAGE_THRESHOLD:
+    if phone_detected and currTime - last_phone_detected_time > PHONE_USAGE_THRESHOLD:
         status_text += "Using Phone (Not Focused)"
         status_color = (0, 0, 255)  # Red
     elif not face_detected:
