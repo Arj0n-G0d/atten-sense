@@ -1,4 +1,4 @@
-# 📌 AttenSense – Real-Time Attention Tracking System
+# 🧠 AttenSense – Real-Time Attention Tracking System
 
 **Problem Statement:** Accurately measure and analyze a user's attention span during video sessions using real-time computer vision.
 
@@ -85,7 +85,7 @@
 
 ---
 
-## 📷 Suggested Images for README
+## 📷 Project Highlights
 
 1. **Landing Page**  
    ![Landing](assets/landing.png)
