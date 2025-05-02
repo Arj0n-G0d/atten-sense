@@ -88,30 +88,30 @@
 ## 📷 Suggested Images for README
 
 1. **Landing Page**  
-   ![Landing][assets/landing.png]
+   ![Landing](assets/landing.png)
 
 2. **Demo: Live Video Feed**  
-   ![Demo 1][assets/demo1.png]
-   ![Demo 2][assets/demo2.png]
-   ![Demo 3][assets/demo3.png]
-   ![Demo 4][assets/demo4.png]
-   ![Demo 5][assets/demo5.png]
+   ![Demo 1](assets/demo1.png)
+   ![Demo 2](assets/demo2.png)
+   ![Demo 3](assets/demo3.png)
+   ![Demo 4](assets/demo4.png)
+   ![Demo 5](assets/demo5.png)
 
 3. **Session Report**  
-   ![Session Report][assets/session-report.png]
+   ![Session Report](assets/session-report.png)
 
 4. **CSV Output Preview**  
-   ![Session Report CSV][assets/session-report-csv.png]
+   ![Session Report CSV](assets/session-report-csv.png)
 
 5. **Streamlit UI**  
-   ![Find by ID and Name][assets/find-by-id-name.png]
-   ![Search 1][assets/search1.png]
-   ![Search 2][assets/search2.png]
+   ![Find by ID and Name](assets/find-by-id-name.png)
+   ![Search 1](assets/search1.png)
+   ![Search 2](assets/search2.png)
 
 6. **API Request Sample**  
-   ![API Image 1][assets/api-image1.png]
-   ![API Image 2][assets/api-image2.png]
-   ![API Video][assets/api-video.png]
+   ![API Image 1](assets/api-image1.png)
+   ![API Image 2](assets/api-image2.png)
+   ![API Video](assets/api-video.png)
 
 ---
 
