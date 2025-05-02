@@ -341,7 +341,7 @@ if st.session_state.view == "main":
                         f'<p class="focus-text {color_class}" style="font-size: 36px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
                         unsafe_allow_html=True
                     )
-                    time.sleep(0.05)
+                    time.sleep(0.1)
 
                 cap.release()
 
@@ -374,7 +374,7 @@ if st.session_state.view == "main":
                         f'<p class="focus-text {color_class}" style="font-size: 36px; font-weight: bold; text-align: center; padding: 10px; border-radius: 10px; background-color: #FDFBEE">{status_text}</p>',
                         unsafe_allow_html=True
                     )
-                    time.sleep(0.05)
+                    time.sleep(0.1)
 
                 cap.release()
 
