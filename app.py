@@ -1,7 +1,7 @@
 import pandas as pd
 from io import StringIO
 import streamlit as st
-from src.frame_processor import process_frame
+from src.video_frame_processor import process_video_frame
 from db.db_utils import create_db, insert_focus_session, insert_focus_log, get_session_by_id, get_sessions_by_name
 import time
 import cv2
@@ -325,7 +325,7 @@ if st.session_state.view == "main":
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     
                     # Process frame and get focus status
-                    frame, is_focused = process_frame(frame)
+                    frame, is_focused = process_video_frame(frame)
 
                     start_time = st.session_state.start_time
                     current_time = time.time() - start_time
@@ -360,7 +360,7 @@ if st.session_state.view == "main":
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     
                     # Process frame and get focus status
-                    frame, is_focused = process_frame(frame)
+                    frame, is_focused = process_video_frame(frame)
 
                     start_time = st.session_state.start_time
                     current_time = time.time() - start_time
