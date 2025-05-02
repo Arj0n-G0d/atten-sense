@@ -119,8 +119,8 @@
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-repo/attensense.git
-cd attensense
+git clone https://github.com/Arj0n-G0d/atten-sense.git
+cd atten-sense
 
 # (Recommended) Create virtual environment
 python -m venv venv
@@ -133,4 +133,4 @@ pip install -r requirements.txt
 streamlit run app.py
 
 # Run backend
-uvicorn main:app --reload
+uvicorn server:app --reload
