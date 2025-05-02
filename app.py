@@ -9,29 +9,29 @@ import tempfile
 import os
 import altair as alt
 
-def group_focus_log(focus_log):
-    if not focus_log:
+def group_focus_log(focus_logs):
+    if not focus_logs:
         return []
     
-    grouped_log = []
-    start_time, state = focus_log[0]  # Initialize with first entry
+    grouped_logs = []
+    start_time, state = focus_logs[0]  # Initialize with first entry
 
-    for i in range(1, len(focus_log)):
-        current_time, current_state = focus_log[i]
+    for i in range(1, len(focus_logs)):
+        current_time, current_state = focus_logs[i]
 
         # If state changes, store the previous segment
         if current_state != state:
-            grouped_log.append((start_time, current_time, state))  # (start, end, state)
+            grouped_logs.append((start_time, current_time, state))  # (start, end, state)
             start_time = current_time  # Update start time for the new state
             state = current_state  # Update state
 
     # Append last segment
-    grouped_log.append((start_time, focus_log[-1][0] + 0.05, state))
+    grouped_logs.append((start_time, focus_logs[-1][0] + 0.05, state))
     
-    return grouped_log
+    return grouped_logs
 
-def create_data_frame(focus_log):
-    df = pd.DataFrame(focus_log, columns = ["Start", "End", "Focused"])
+def create_data_frame(focus_logs):
+    df = pd.DataFrame(focus_logs, columns = ["Start", "End", "Focused"])
     df["Duration"] = df["End"] - df["Start"]
     df["Focus State"] = df["Focused"].map({True: "Focused", False: "Not Focused"})
     df.drop("Focused", axis = 1, inplace = True)
@@ -250,8 +250,8 @@ if "uploaded_video" not in st.session_state:
     st.session_state.uploaded_video = None
 if "uploaded_video_path" not in st.session_state:
     st.session_state.uploaded_video_path = None
-if "focus_log" not in st.session_state:
-    st.session_state.focus_log = []
+if "focus_logs" not in st.session_state:
+    st.session_state.focus_logs = []
 if "name" not in st.session_state:
     st.session_state.name = None
 if "current_session_id" not in st.session_state:
@@ -301,7 +301,7 @@ if st.session_state.view == "main":
                 st.session_state.current_session_id, st.session_state.current_date = insert_focus_session(st.session_state.name)
                 
                 # Insert focus logs
-                grouped_focus_logs = group_focus_log(st.session_state.focus_log)
+                grouped_focus_logs = group_focus_log(st.session_state.focus_logs)
                 for (start, end, focus_state) in grouped_focus_logs:
                     insert_focus_log(st.session_state.current_session_id, start, end, focus_state)
                 
@@ -329,7 +329,7 @@ if st.session_state.view == "main":
 
                     start_time = st.session_state.start_time
                     current_time = time.time() - start_time
-                    st.session_state.focus_log.append((current_time, is_focused))
+                    st.session_state.focus_logs.append((current_time, is_focused))
 
                     stframe.image(frame, channels="RGB")
 
@@ -364,7 +364,7 @@ if st.session_state.view == "main":
 
                     start_time = st.session_state.start_time
                     current_time = time.time() - start_time
-                    st.session_state.focus_log.append((current_time, is_focused))
+                    st.session_state.focus_logs.append((current_time, is_focused))
 
                     stframe.image(frame, channels="RGB")
                     status_text = "Focused" if is_focused else "Not Focused"
@@ -380,8 +380,8 @@ if st.session_state.view == "main":
 
         # Report phase
         if st.session_state.analysis_phase == "analysis_complete":
-            focus_log = st.session_state.focus_log
-            grouped_focus_logs = group_focus_log(focus_log)
+            focus_logs = st.session_state.focus_logs
+            grouped_focus_logs = group_focus_log(focus_logs)
             name = st.session_state.name
             session_id = st.session_state.current_session_id
             date = st.session_state.current_date
@@ -391,7 +391,7 @@ if st.session_state.view == "main":
             
             if st.button("Return to Home"):
                 st.session_state.analysis_phase = "idle"
-                st.session_state.focus_log = []
+                st.session_state.focus_logs = []
                 st.session_state.uploaded_video_path = None
                 st.session_state.name = None
                 st.session_state.current_session_id = None

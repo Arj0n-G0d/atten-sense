@@ -254,7 +254,7 @@ def process_image_frame(frame):
                             x = int(landmark.x * w)
                             y = int(landmark.y * h)
                             right_iris.append((x, y))
-
+                        print("Hello", gaze)
                         # Calculate iris centers
                         def iris_center(iris):
                             x = int(np.mean([pt[0] for pt in iris]))
@@ -276,20 +276,21 @@ def process_image_frame(frame):
 
                         if gaze != "Center":
                             is_focused = False
+                        else:
+                            gaze = None
 
-                        """///////////////// Gaze Evaluation END /////////////////"""
-                        
+                        """///////////////// Gaze Evaluation END /////////////////""" 
     prediction = ""
     if has_phone_detected:
-        prediction += "Using Phone (Not Focused)"
+        prediction += "Using Phone"
     elif not has_face_detected:
-        prediction += "No Face (Not Focused)"
+        prediction += "No Face"
     elif not has_head_moved and are_eyes_closed:
-        prediction += "Eyes Closed (Not Focused)"
+        prediction += "Eyes Closed"
     elif has_head_moved:
-        prediction += "Looking Away (Not Focused)"
+        prediction += "Looking Away"
     elif gaze != None:
-        prediction += "Gazing Away (Not Focused)"
+        prediction += "Gazing Away"
     elif not is_focused:
         prediction += "Not Focused"
     else:
