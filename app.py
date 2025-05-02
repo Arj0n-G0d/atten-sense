@@ -93,13 +93,14 @@ def display_session_report(session_id, name, date, grouped_focus_logs):
     # Convert to CSV
     csv_data = focus_df.to_csv(index = False)
 
-    # Provide a download button
     st.download_button(
         label = "📥 Download Focus Report",
         data = csv_data,
         file_name = f"focus_report_session_{session_id}.csv",
-        mime = "text/csv"
+        mime = "text/csv",
+        key=f"download_button_{session_id}" 
     )
+
 
 st.set_page_config(page_title = "AttenSense", layout = "centered")
 
